@@ -1,240 +1,79 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3語ランダムお題箱</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #fafafa;
-      padding: 24px;
-      max-width: 720px;
-      margin: auto;
-    }
-    h1 { font-size: 1.5rem; }
-    textarea {
-      width: 100%;
-      min-height: 160px;
-      padding: 12px;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-    button {
-      margin-top: 12px;
-      padding: 10px 16px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-    .result {
-      margin-top: 24px;
-      padding: 16px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      font-size: 1.2rem;
-      text-align: center;
-    }
-    .small { font-size: 0.9rem; color: #555; }
-  </style>
+<meta charset="UTF-8">
+<title>お題ジェネレーター</title>
+<style>
+body{
+font-family:sans-serif;
+padding:20px;
+}
+
+textarea{
+width:100%;
+height:80px;
+margin-bottom:10px;
+}
+
+button{
+padding:10px 20px;
+font-size:16px;
+}
+
+.result{
+margin-top:20px;
+font-size:24px;
+font-weight:bold;
+}
+</style>
 </head>
+
 <body>
-  <h1>📅 1日1枚お題箱</h1>
-  <p id="today"></p>
 
-  <p>イラスト練習向け：<strong>単語をたくさん入れて、ランダムで3つ組み合わせます</strong></p>
+<h1>イラストお題ジェネレーター</h1>
 
-  <label>① 単語リスト（ / 区切り）</label>
-  <textarea id="words" placeholder="例：
-猫耳の少年/夜のカフェ/待ち合わせ/魔法使い/雨の街/走っている"></textarea>
-  <p class="small">※ 入力内容はURLに保存されます。このURLを開けば他の端末でも同じ単語が使えます。</p>
+<p>単語は / で区切って入力</p>
 
-  <button onclick="pickWords()">🎲 今日のお題を作る</button>
-  <button onclick="pickWords(true)">🔄 手動で引き直す</button>
-  <button onclick="copyURL()">📋 URLをコピー</button>
+<h3>単語</h3>
+<textarea id="words"></textarea>
 
-  <div id="result" class="result" style="display:none;"></div>
+<h3>テーマ</h3>
+<textarea id="theme"></textarea>
 
-  <div id="timer" class="result" style="display:none; font-size:1rem;"></div>
-  <button onclick="startTimer(30)">⏱ 30分</button>
-  <button onclick="startTimer(60)">⏱ 60分</button>
+<button onclick="generate()">ランダム生成</button>
 
-  <label style="display:block; margin-top:16px;">
-    <input type="checkbox" id="doneCheck" onchange="toggleDone()" /> 今日描いた
-  </label>
+<div class="result" id="result"></div>
 
-  <div id="calendar" class="result"></div>
+<script>
 
-  <script>
-/* ===== 単語保存（URL + ローカル） ===== */
-function saveWords() {
-  const words = document.getElementById('words').value.trim();
-
-  // URL保存
-  const url = new URL(window.location);
-  url.searchParams.set('words', words);
-  history.replaceState(null, '', url);
-
-  // ローカル保存（URLがない場合の保険）
-  localStorage.setItem('odai_words', words);
+function randomPick(arr){
+return arr[Math.floor(Math.random()*arr.length)]
 }
 
-function loadWords() {
-  const params = new URLSearchParams(window.location.search);
-  const fromURL = params.get('words');
+function generate(){
 
-  if (fromURL) {
-    document.getElementById('words').value = fromURL;
-  } else {
-    const local = localStorage.getItem('odai_words');
-    if (local) document.getElementById('words').value = local;
-  }
+const words = document.getElementById("words").value.split("/").filter(v=>v.trim()!="")
+const themes = document.getElementById("theme").value.split("/").filter(v=>v.trim()!="")
+
+if(words.length < 3){
+alert("単語を3つ以上入力してください")
+return
 }
 
-/* ===== URLコピー ===== */
-function copyURL() {
-  saveWords();
-  const url = window.location.href;
+const shuffled = words.sort(()=>0.5-Math.random())
+const selected = shuffled.slice(0,3)
 
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url)
-      .then(()=>alert('URLをコピーしました'))
-      .catch(()=>manualCopy(url));
-  } else {
-    manualCopy(url);
-  }
+let themeText = ""
+if(themes.length>0){
+themeText = "テーマ："+randomPick(themes)
 }
 
-function manualCopy(text){
-  prompt('このURLをコピーしてください', text);
+document.getElementById("result").innerHTML =
+selected.join(" / ") + "<br><br>" + themeText
+
 }
 
-/* ===== お題生成 ===== */
-function pickWords(forceRandom = false) {
-  saveWords();
-
-  const words = document.getElementById('words').value
-    .split('/')
-    .map(w => w.trim())
-    .filter(w => w.length > 0);
-
-  if (words.length < 3) {
-    alert('単語を3つ以上入力してください');
-    return;
-  }
-
-  const today = new Date().toISOString().slice(0,10);
-
-  // 今日のお題が保存されているか
-  if (!forceRandom) {
-    const saved = localStorage.getItem('odai_today_' + today);
-    if (saved) {
-      const result = document.getElementById('result');
-      result.style.display = 'block';
-      result.textContent = saved;
-      return;
-    }
-  }
-
-  let seed = Number(today.replace(/-/g,''));
-
-  const seededRandom = () => {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
-  };
-
-  const shuffled = [...words].sort(
-    () => (forceRandom ? Math.random() : seededRandom()) - 0.5
-  );
-
-  const selected = shuffled.slice(0,3);
-
-  const text = `${selected[0]} × ${selected[1]} × ${selected[2]}`;
-
-  const result = document.getElementById('result');
-  result.style.display='block';
-  result.textContent = text;
-
-  // 今日のお題として保存
-  if (!forceRandom) {
-    localStorage.setItem('odai_today_' + today, text);
-  }
-}
-
-/* ===== タイマー ===== */
-let timerInterval;
-function startTimer(min){
-  clearInterval(timerInterval);
-
-  let seconds = min*60;
-  const timer = document.getElementById('timer');
-  timer.style.display='block';
-
-  timerInterval=setInterval(()=>{
-    const m=Math.floor(seconds/60);
-    const s=seconds%60;
-
-    timer.textContent=`残り時間：${m}:${s.toString().padStart(2,'0')}`;
-
-    if(seconds--<=0) clearInterval(timerInterval);
-
-  },1000);
-}
-
-/* ===== 描いた記録 ===== */
-const todayKey = new Date().toISOString().slice(0,10);
-
-function toggleDone(){
-  localStorage.setItem(todayKey, document.getElementById('doneCheck').checked);
-  renderCalendar();
-}
-
-function renderCalendar(){
-
-  const cal=document.getElementById('calendar');
-
-  cal.innerHTML='<strong>今月の記録</strong><br>';
-
-  const now=new Date();
-
-  const days=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-
-  for(let d=1; d<=days; d++){
-
-    const key=new Date(now.getFullYear(), now.getMonth(), d).toISOString().slice(0,10);
-
-    const done=localStorage.getItem(key)==='true';
-
-    cal.innerHTML += done ? `✅${d} ` : `▫️${d} `;
-
-  }
-}
-
-/* ===== 初期化 ===== */
-const today = new Date();
-
-document.getElementById('today').textContent=
-`今日（${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}）のお題`;
-
-window.onload=()=>{
-
-  loadWords();
-
-  document.getElementById('doneCheck').checked = localStorage.getItem(todayKey)==='true';
-
-  pickWords();
-
-  renderCalendar();
-
-};
-
-// 入力したら自動保存
-
-document.addEventListener('input', (e)=>{
-
-  if(e.target.id==='words') saveWords();
-
-});
 </script>
+
 </body>
 </html>
