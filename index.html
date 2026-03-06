@@ -49,7 +49,7 @@
   <h1>📅 1日1枚お題箱</h1>
   <p id="today"></p>
 
-  <p>イラスト練習向け：<strong>単語をたくさん入れて、ランダムで3つ組み合わせます</strong></p>
+  <p>イラスト練習向け：<strong>単語をたくさん入れて、ランダムで5つ組み合わせます</strong></p>
 
   <label>① 単語リスト（ / 区切り）</label>
   <textarea id="words" placeholder="例：
@@ -138,7 +138,7 @@ function pickWords(forceRandom = false) {
     .filter(w => w.length > 0);
 
   if (words.length < 3) {
-    alert('単語を3つ以上入力してください');
+    alert('単語を5つ以上入力してください');
     return;
   }
 
@@ -163,9 +163,9 @@ function pickWords(forceRandom = false) {
     () => (forceRandom ? Math.random() : seededRandom()) - 0.5
   );
 
-  const selected = shuffled.slice(0,3);
+  const selected = shuffled.slice(0,5);
 
-  const text = `${selected[0]} × ${selected[1]} × ${selected[2]}`;
+  const text = `${selected[0]} × ${selected[1]} × ${selected[2]} × ${selected[3]} × ${selected[4]}`;
 
   if (!forceRandom) {
     localStorage.setItem('odai_today_' + today, text);
