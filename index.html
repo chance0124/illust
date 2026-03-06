@@ -66,121 +66,175 @@
   <div id="calendar" class="result"></div>
 
   <script>
-    /* ===== URL保存・復元 ===== */
-    function saveWordsToURL() {
-      const words = document.getElementById('words').value;
-      const encoded = encodeURIComponent(words);
-      const url = new URL(window.location);
-      url.searchParams.set('words', encoded);
-      history.replaceState(null, '', url);
-    }
+/* ===== 単語保存（URL + ローカル） ===== */
+function saveWords() {
+  const words = document.getElementById('words').value.trim();
 
-    function loadWordsFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      const encoded = params.get('words');
-      if (encoded) {
-        document.getElementById('words').value = decodeURIComponent(encoded);
-      }
-    }
+  // URL保存
+  const url = new URL(window.location);
+  url.searchParams.set('words', words);
+  history.replaceState(null, '', url);
 
-    function copyURL() {
-  const url = window.location.href;
+  // ローカル保存（URLがない場合の保険）
+  localStorage.setItem('odai_words', words);
+}
 
-  // Clipboard API（iOS Safariは失敗しやすい）
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url)
-      .then(() => alert('URLをコピーしました'))
-      .catch(() => showManualCopy(url));
+function loadWords() {
+  const params = new URLSearchParams(window.location.search);
+  const fromURL = params.get('words');
+
+  if (fromURL) {
+    document.getElementById('words').value = fromURL;
   } else {
-    showManualCopy(url);
+    const local = localStorage.getItem('odai_words');
+    if (local) document.getElementById('words').value = local;
   }
 }
 
-function showManualCopy(text) {
-  // iPad / iOS Safari 向け：確実に使える方法
+/* ===== URLコピー ===== */
+function copyURL() {
+  saveWords();
+  const url = window.location.href;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url)
+      .then(()=>alert('URLをコピーしました'))
+      .catch(()=>manualCopy(url));
+  } else {
+    manualCopy(url);
+  }
+}
+
+function manualCopy(text){
   prompt('このURLをコピーしてください', text);
 }
 
-    /* ===== お題生成 ===== */
-    function pickWords(forceRandom = false) {
-      saveWordsToURL();
+/* ===== お題生成 ===== */
+function pickWords(forceRandom = false) {
+  saveWords();
 
-      const words = document.getElementById('words').value
-        .split(/\//)
-        .map(w => w.trim())
-        .filter(w => w.length > 0);
+  const words = document.getElementById('words').value
+    .split('/')
+    .map(w => w.trim())
+    .filter(w => w.length > 0);
 
-      if (words.length < 3) {
-        alert('単語を3つ以上入力してください');
-        return;
-      }
+  if (words.length < 3) {
+    alert('単語を3つ以上入力してください');
+    return;
+  }
 
-      let seed = forceRandom
-        ? Math.random() * 100000
-        : Number(new Date().toISOString().slice(0,10).replace(/-/g,''));
+  const today = new Date().toISOString().slice(0,10);
 
-      const seededRandom = () => {
-        seed = (seed * 9301 + 49297) % 233280;
-        return seed / 233280;
-      };
-
-      const shuffled = [...words].sort(
-        () => (forceRandom ? Math.random() : seededRandom()) - 0.5
-      );
-
-      const selected = shuffled.slice(0, 3);
-
+  // 今日のお題が保存されているか
+  if (!forceRandom) {
+    const saved = localStorage.getItem('odai_today_' + today);
+    if (saved) {
       const result = document.getElementById('result');
       result.style.display = 'block';
-      result.textContent = `${selected[0]} × ${selected[1]} × ${selected[2]}`;
+      result.textContent = saved;
+      return;
     }
+  }
 
-    /* ===== タイマー ===== */
-    let timerInterval;
-    function startTimer(min) {
-      clearInterval(timerInterval);
-      let seconds = min * 60;
-      const timer = document.getElementById('timer');
-      timer.style.display = 'block';
+  let seed = Number(today.replace(/-/g,''));
 
-      timerInterval = setInterval(() => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        timer.textContent = `残り時間：${m}:${s.toString().padStart(2,'0')}`;
-        if (seconds-- <= 0) clearInterval(timerInterval);
-      }, 1000);
-    }
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
 
-    /* ===== 描いた記録 ===== */
-    const todayKey = new Date().toISOString().slice(0,10);
+  const shuffled = [...words].sort(
+    () => (forceRandom ? Math.random() : seededRandom()) - 0.5
+  );
 
-    function toggleDone() {
-      localStorage.setItem(todayKey, document.getElementById('doneCheck').checked);
-      renderCalendar();
-    }
+  const selected = shuffled.slice(0,3);
 
-    function renderCalendar() {
-      const cal = document.getElementById('calendar');
-      cal.innerHTML = '<strong>今月の記録</strong><br>';
-      const now = new Date();
-      const days = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-      for (let d = 1; d <= days; d++) {
-        const key = new Date(now.getFullYear(), now.getMonth(), d).toISOString().slice(0,10);
-        const done = localStorage.getItem(key) === 'true';
-        cal.innerHTML += done ? `✅${d} ` : `▫️${d} `;
-      }
-    }
+  const text = `${selected[0]} × ${selected[1]} × ${selected[2]}`;
 
-    /* ===== 初期化 ===== */
-    const today = new Date();
-    document.getElementById('today').textContent = `今日（${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}）のお題`;
+  const result = document.getElementById('result');
+  result.style.display='block';
+  result.textContent = text;
 
-    window.onload = () => {
-      loadWordsFromURL();
-      document.getElementById('doneCheck').checked = localStorage.getItem(todayKey) === 'true';
-      pickWords();
-      renderCalendar();
-    };
-  </script>
+  // 今日のお題として保存
+  if (!forceRandom) {
+    localStorage.setItem('odai_today_' + today, text);
+  }
+}
+
+/* ===== タイマー ===== */
+let timerInterval;
+function startTimer(min){
+  clearInterval(timerInterval);
+
+  let seconds = min*60;
+  const timer = document.getElementById('timer');
+  timer.style.display='block';
+
+  timerInterval=setInterval(()=>{
+    const m=Math.floor(seconds/60);
+    const s=seconds%60;
+
+    timer.textContent=`残り時間：${m}:${s.toString().padStart(2,'0')}`;
+
+    if(seconds--<=0) clearInterval(timerInterval);
+
+  },1000);
+}
+
+/* ===== 描いた記録 ===== */
+const todayKey = new Date().toISOString().slice(0,10);
+
+function toggleDone(){
+  localStorage.setItem(todayKey, document.getElementById('doneCheck').checked);
+  renderCalendar();
+}
+
+function renderCalendar(){
+
+  const cal=document.getElementById('calendar');
+
+  cal.innerHTML='<strong>今月の記録</strong><br>';
+
+  const now=new Date();
+
+  const days=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+
+  for(let d=1; d<=days; d++){
+
+    const key=new Date(now.getFullYear(), now.getMonth(), d).toISOString().slice(0,10);
+
+    const done=localStorage.getItem(key)==='true';
+
+    cal.innerHTML += done ? `✅${d} ` : `▫️${d} `;
+
+  }
+}
+
+/* ===== 初期化 ===== */
+const today = new Date();
+
+document.getElementById('today').textContent=
+`今日（${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}）のお題`;
+
+window.onload=()=>{
+
+  loadWords();
+
+  document.getElementById('doneCheck').checked = localStorage.getItem(todayKey)==='true';
+
+  pickWords();
+
+  renderCalendar();
+
+};
+
+// 入力したら自動保存
+
+document.addEventListener('input', (e)=>{
+
+  if(e.target.id==='words') saveWords();
+
+});
+</script>
 </body>
 </html>
